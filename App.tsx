@@ -156,12 +156,12 @@ const App: React.FC = () => {
         }
     };
 
-    const handleRecipeSearch = async (query: string) => {
+    const handleRecipeSearch = async (query: string, includeIngredients: string[], excludeIngredients: string[]) => {
         setIsSearching(true);
         setSearchError(null);
         setSearchResults(null);
         try {
-            const results = await apiSearchRecipes(query);
+            const results = await apiSearchRecipes(query, includeIngredients, excludeIngredients);
             setSearchResults(results);
         } catch (err: any) {
             setSearchError(err.message || 'An unknown error occurred while searching.');

@@ -17,6 +17,8 @@ const BudgetSetup: React.FC<BudgetSetupProps> = ({ onGenerate, disabled }) => {
   const [selectedMeals, setSelectedMeals] = useState<Set<typeof mealTypesOptions[number]>>(new Set(['Dinner']));
   const [wantsCrockpot, setWantsCrockpot] = useState(false);
   const [preferredStores, setPreferredStores] = useState<Set<string>>(new Set());
+  const [includeIngredients, setIncludeIngredients] = useState('');
+  const [excludeIngredients, setExcludeIngredients] = useState('');
 
   const handleMealTypeChange = (mealType: typeof mealTypesOptions[number]) => {
     setSelectedMeals(prev => {
@@ -56,6 +58,8 @@ const BudgetSetup: React.FC<BudgetSetupProps> = ({ onGenerate, disabled }) => {
       mealTypes: Array.from(selectedMeals),
       wantsCrockpot,
       preferredStores: Array.from(preferredStores),
+      includeIngredients: includeIngredients.split(',').map(s => s.trim()).filter(Boolean),
+      excludeIngredients: excludeIngredients.split(',').map(s => s.trim()).filter(Boolean),
     });
   };
 
@@ -93,6 +97,19 @@ const BudgetSetup: React.FC<BudgetSetupProps> = ({ onGenerate, disabled }) => {
         <div style={{ marginBottom: '24px' }}>
           <label htmlFor="preferences" style={labelStyle}>Dietary Preferences or Restrictions</label>
           <textarea id="preferences" value={preferences} onChange={e => setPreferences(e.target.value)} placeholder="e.g., vegetarian, gluten-free, no nuts" style={{...inputStyle, minHeight: '80px', resize: 'vertical' }} />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+             <div>
+                <label htmlFor="include-ingredients" style={labelStyle}>Include Ingredients</label>
+                <input type="text" id="include-ingredients" value={includeIngredients} onChange={e => setIncludeIngredients(e.target.value)} placeholder="e.g., chicken, broccoli" style={inputStyle} />
+                 <p style={helperTextStyle}>Separate with commas</p>
+            </div>
+            <div>
+                <label htmlFor="exclude-ingredients" style={labelStyle}>Exclude Ingredients</label>
+                <input type="text" id="exclude-ingredients" value={excludeIngredients} onChange={e => setExcludeIngredients(e.target.value)} placeholder="e.g., peanuts, shellfish" style={inputStyle} />
+                 <p style={helperTextStyle}>Separate with commas</p>
+            </div>
         </div>
 
         <div style={{ marginBottom: '24px' }}>
@@ -174,5 +191,12 @@ const checkboxLabelStyle = (checked: boolean): React.CSSProperties => ({
     color: '#555',
     fontWeight: 500
 });
+
+const helperTextStyle: React.CSSProperties = {
+    fontSize: '13px',
+    color: '#6c757d',
+    marginTop: '6px',
+    marginBottom: 0
+};
 
 export default BudgetSetup;

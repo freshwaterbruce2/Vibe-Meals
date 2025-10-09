@@ -8,6 +8,8 @@ export interface MealPlanSettings {
   mealTypes: string[];
   wantsCrockpot: boolean;
   preferredStores: string[];
+  includeIngredients?: string[];
+  excludeIngredients?: string[];
 }
 
 export interface Ingredient {

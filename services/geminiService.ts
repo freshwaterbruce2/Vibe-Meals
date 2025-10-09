@@ -63,15 +63,25 @@ const mealPlanResponseSchema = {
 };
 
 const generatePrompt = (settings: MealPlanSettings): string => {
-    return `Create a meal plan for ${settings.people} people for ${settings.days} days.
+    let prompt = `Create a meal plan for ${settings.people} people for ${settings.days} days.
 The total budget for all meals is $${settings.budget}.
 Dietary preferences and restrictions: ${settings.preferences || 'None'}.
 Plan for the following meals: ${settings.mealTypes.join(', ')}.
 ${settings.wantsCrockpot ? 'Prioritize crockpot-friendly meals where possible, especially for dinner.' : ''}
-${settings.preferredStores && settings.preferredStores.length > 0 ? `Assume ingredients are purchased from one of these stores: ${settings.preferredStores.join(', ')} when estimating costs.` : ''}
+${settings.preferredStores && settings.preferredStores.length > 0 ? `Assume ingredients are purchased from one of these stores: ${settings.preferredStores.join(', ')} when estimating costs.` : ''}`;
+
+    if (settings.includeIngredients && settings.includeIngredients.length > 0) {
+        prompt += `\nIt is crucial that the meal plan includes recipes that use the following ingredients: ${settings.includeIngredients.join(', ')}.`;
+    }
+    if (settings.excludeIngredients && settings.excludeIngredients.length > 0) {
+        prompt += `\nAbsolutely do not include any recipes with these ingredients: ${settings.excludeIngredients.join(', ')}.`;
+    }
+
+    prompt += `
 Provide a detailed response in JSON format. For each day, provide recipes for the requested meals. Each recipe must include a name, a list of ingredients with amounts and units, step-by-step instructions, an estimated cost, prep_time_minutes, cook_time_minutes, and nutritional estimates (total_calories, protein_grams, carbs_grams, fat_grams). The sum of all recipe costs should be close to the total_estimated_cost. Calculate the total_estimated_cost for the entire plan.
 Ensure the output matches the provided JSON schema. The "day" property should be the day of the week (e.g., Monday, Tuesday).
 `;
+    return prompt;
 };
 
 export const generateMealPlan = async (settings: MealPlanSettings): Promise<MealPlanResponse> => {
@@ -415,9 +425,17 @@ const recipeSearchResponseSchema = {
     required: ["recipes"]
 };
 
-export const searchRecipes = async (query: string): Promise<Recipe[]> => {
-    const prompt = `
-Find 3 diverse recipes based on the following search query: "${query}".
+export const searchRecipes = async (query: string, includeIngredients: string[], excludeIngredients: string[]): Promise<Recipe[]> => {
+    let prompt = `Find 3 diverse recipes based on the following search query: "${query}".`;
+
+    if (includeIngredients && includeIngredients.length > 0) {
+        prompt += `\nThe recipes MUST include the following ingredients: ${includeIngredients.join(', ')}.`;
+    }
+    if (excludeIngredients && excludeIngredients.length > 0) {
+        prompt += `\nThe recipes MUST NOT include the following ingredients: ${excludeIngredients.join(', ')}.`;
+    }
+
+    prompt += `
 The recipes should be suitable for home cooking.
 For each recipe, provide a detailed response in JSON format. Each recipe must include a name, a list of ingredients with amounts and units, step-by-step instructions, an estimated cost, prep_time_minutes, cook_time_minutes, and nutritional estimates (total_calories, protein_grams, carbs_grams, fat_grams).
 Ensure the output is a JSON object with a single key "recipes", which is an array of these recipe objects.
