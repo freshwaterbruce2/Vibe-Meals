@@ -7,6 +7,7 @@ export interface MealPlanSettings {
   preferences: string;
   mealTypes: string[];
   wantsCrockpot: boolean;
+  preferredStores: string[];
 }
 
 export interface Ingredient {
@@ -20,6 +21,9 @@ export interface Recipe {
   ingredients: Ingredient[];
   instructions: string[];
   estimated_cost: number;
+  prep_time_minutes?: number;
+  cook_time_minutes?: number;
+  total_calories?: number;
 }
 
 export interface DayPlan {
@@ -50,4 +54,10 @@ export interface ComparisonPrice {
 export interface ComparisonResult {
     itemName: string;
     prices: ComparisonPrice[];
+}
+
+export interface SimpleRecipe {
+    name: string;
+    description: string;
+    ingredients_used: string[];
 }

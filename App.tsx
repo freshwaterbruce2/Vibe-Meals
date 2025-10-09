@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import BudgetSetup from './components/BudgetSetup';
 import Header from './components/Header';
 import MealPlanDisplay from './components/MealPlanDisplay';
@@ -6,14 +6,51 @@ import Loader from './components/Loader';
 import ErrorDisplay from './components/ErrorDisplay';
 import ShoppingList from './components/ShoppingList';
 import PantryTracker from './components/PantryTracker';
+import SavedPlansModal from './components/SavedPlansModal';
 import { MealPlanSettings, MealPlanResponse } from './types';
 import { generateMealPlan, replaceRecipe as apiReplaceRecipe } from './services/geminiService';
+
+interface SavedPlan {
+    name: string;
+    id: number;
+    settings: MealPlanSettings;
+    mealPlan: MealPlanResponse;
+}
 
 const App: React.FC = () => {
     const [settings, setSettings] = useState<MealPlanSettings | null>(null);
     const [mealPlan, setMealPlan] = useState<MealPlanResponse | null>(null);
     const [loadingState, setLoadingState] = useState<string>('idle'); // idle, generating, replacing-DAY-MEAL, error
     const [error, setError] = useState<string | null>(null);
+    const [isFormVisible, setIsFormVisible] = useState(false);
+    const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
+    const [isPlansModalVisible, setIsPlansModalVisible] = useState(false);
+    const [pantryItems, setPantryItems] = useState<string[]>([]);
+
+    useEffect(() => {
+        try {
+            const storedPlans = localStorage.getItem('mealVibePlans');
+            if (storedPlans) {
+                setSavedPlans(JSON.parse(storedPlans));
+            }
+            const storedPantry = localStorage.getItem('mealVibePantry');
+            if (storedPantry) {
+                setPantryItems(JSON.parse(storedPantry));
+            } else {
+                // Set some defaults for first-time users
+                setPantryItems(['Salt', 'Pepper', 'Olive Oil', 'Garlic', 'Onion']);
+            }
+        } catch (error) {
+            console.error("Failed to load from local storage:", error);
+            setSavedPlans([]);
+            setPantryItems(['Salt', 'Pepper', 'Olive Oil', 'Garlic', 'Onion']);
+        }
+    }, []);
+
+    const handlePantryUpdate = (newItems: string[]) => {
+        setPantryItems(newItems);
+        localStorage.setItem('mealVibePantry', JSON.stringify(newItems));
+    };
 
     const handleGenerateMealPlan = async (newSettings: MealPlanSettings) => {
         setLoadingState('generating');
@@ -76,31 +113,112 @@ const App: React.FC = () => {
             handleGenerateMealPlan(settings);
         } else {
             setLoadingState('idle');
+            setIsFormVisible(true);
+        }
+    };
+
+    const handleSavePlan = () => {
+        if (!mealPlan || !settings) return;
+        const planName = prompt("Enter a name for this meal plan:", `Plan for ${settings.days} days`);
+        if (planName) {
+            const newPlan: SavedPlan = {
+                name: planName,
+                id: Date.now(),
+                settings,
+                mealPlan,
+            };
+            const updatedPlans = [...savedPlans, newPlan];
+            setSavedPlans(updatedPlans);
+            localStorage.setItem('mealVibePlans', JSON.stringify(updatedPlans));
+            alert(`Plan "${planName}" saved successfully!`);
+        }
+    };
+
+    const handleLoadPlan = (planToLoad: SavedPlan) => {
+        setSettings(planToLoad.settings);
+        setMealPlan(planToLoad.mealPlan);
+        setIsPlansModalVisible(false);
+        setIsFormVisible(false);
+    };
+
+    const handleDeletePlan = (planId: number) => {
+        if (window.confirm("Are you sure you want to delete this plan?")) {
+            const updatedPlans = savedPlans.filter(p => p.id !== planId);
+            setSavedPlans(updatedPlans);
+            localStorage.setItem('mealVibePlans', JSON.stringify(updatedPlans));
         }
     };
 
     return (
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', fontFamily: 'system-ui, sans-serif', backgroundColor: '#f8f9fa' }}>
-            <Header />
-            <BudgetSetup onGenerate={handleGenerateMealPlan} disabled={loadingState === 'generating'} />
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', minHeight: '100vh' }}>
+            <Header onShowPlans={() => setIsPlansModalVisible(true)} hasPlans={savedPlans.length > 0} />
+            
+            {!isFormVisible && !mealPlan && loadingState !== 'generating' && (
+                <div style={{ textAlign: 'center', padding: '80px 20px', color: 'white' }}>
+                    <h1 style={{ fontSize: '3.5rem', fontWeight: 700, textShadow: '0 2px 4px rgba(0,0,0,0.2)', marginBottom: '20px' }}>
+                        Effortless meal planning,
+                        <br />
+                        tailored to you.
+                    </h1>
+                    <p style={{ fontSize: '1.25rem', marginBottom: '40px', opacity: 0.9 }}>
+                        Save time, eat well, and stay on budget with your personal AI chef.
+                    </p>
+                    <button onClick={() => setIsFormVisible(true)} style={heroButtonStyle}>
+                        Start Planning
+                    </button>
+                </div>
+            )}
+
+            {isFormVisible && !mealPlan && loadingState !== 'generating' && (
+                <BudgetSetup onGenerate={handleGenerateMealPlan} disabled={loadingState === 'generating'} />
+            )}
 
             {loadingState === 'generating' && <Loader message="Crafting your personalized meal plan..." />}
             {error && loadingState === 'error' && <ErrorDisplay error={error} onRetry={handleRetry} />}
             
             {mealPlan && settings && (
-                 <div style={{marginTop: '40px'}}>
+                 <div style={{marginTop: '40px', display: 'flex', flexDirection: 'column', gap: '40px'}}>
                     <MealPlanDisplay 
                         mealPlanResponse={mealPlan} 
                         onReplaceRecipe={handleReplaceRecipe}
                         loadingState={loadingState}
                         budget={settings.budget}
+                        onSavePlan={handleSavePlan}
                     />
-                    <ShoppingList mealPlan={mealPlan} />
-                    <PantryTracker />
+                    <ShoppingList mealPlan={mealPlan} pantryItems={pantryItems} />
+                    <PantryTracker 
+                        pantryItems={pantryItems} 
+                        onUpdatePantry={handlePantryUpdate} 
+                        mealPlan={mealPlan}
+                    />
                 </div>
+            )}
+            
+            {isPlansModalVisible && (
+                <SavedPlansModal 
+                    savedPlans={savedPlans}
+                    onLoad={handleLoadPlan}
+                    onDelete={handleDeletePlan}
+                    onClose={() => setIsPlansModalVisible(false)}
+                />
             )}
         </div>
     );
 };
+
+const heroButtonStyle: React.CSSProperties = {
+  padding: '15px 35px',
+  border: 'none',
+  borderRadius: '50px',
+  backgroundColor: '#ffffff',
+  color: '#6a11cb',
+  fontSize: '18px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  transition: 'all 0.3s ease',
+  boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+  transform: 'translateY(0)',
+};
+
 
 export default App;

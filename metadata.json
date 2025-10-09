@@ -1,4 +1,5 @@
 {
   "name": "MealVibe",
-  "description": "An AI-powered smart meal application from Vibe-Tech that revolutionizes household meal planning by combining budget management, nutritional optimization, and automated shopping list generation with a focus on simple, delicious meals."
+  "description": "An AI-powered smart meal application from Vibe-Tech that revolutionizes household meal planning by combining budget management, nutritional optimization, and automated shopping list generation with a focus on simple, delicious meals.",
+  "requestFramePermissions": []
 }

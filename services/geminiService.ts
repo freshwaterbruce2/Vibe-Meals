@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { MealPlanSettings, MealPlanResponse, ShoppingListItem, ComparisonResult, Recipe } from '../types';
+import { MealPlanSettings, MealPlanResponse, ShoppingListItem, ComparisonResult, Recipe, SimpleRecipe } from '../types';
 
 // FIX: Initialize GoogleGenAI with a named apiKey parameter.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -9,7 +9,7 @@ const ingredientSchema = {
     properties: {
         name: { type: Type.STRING },
         // FIX: Use Type.STRING for amount to allow for non-numeric values like "a pinch"
-        amount: { type: Type.STRING, description: "e.g. '2' or '0.5' or 'a pinch'" },
+        amount: { type: Type.STRING, description: "e.g., '2' or '0.5' or 'a pinch'" },
         unit: { type: Type.STRING },
     },
     required: ["name", "amount", "unit"],
@@ -28,8 +28,11 @@ const recipeSchema = {
             items: { type: Type.STRING }
         },
         estimated_cost: { type: Type.NUMBER },
+        prep_time_minutes: { type: Type.NUMBER },
+        cook_time_minutes: { type: Type.NUMBER },
+        total_calories: { type: Type.NUMBER },
     },
-    required: ["name", "ingredients", "instructions", "estimated_cost"],
+    required: ["name", "ingredients", "instructions", "estimated_cost", "prep_time_minutes", "cook_time_minutes", "total_calories"],
 };
 
 const dayPlanSchema = {
@@ -62,7 +65,8 @@ The total budget for all meals is $${settings.budget}.
 Dietary preferences and restrictions: ${settings.preferences || 'None'}.
 Plan for the following meals: ${settings.mealTypes.join(', ')}.
 ${settings.wantsCrockpot ? 'Prioritize crockpot-friendly meals where possible, especially for dinner.' : ''}
-Provide a detailed response in JSON format. For each day, provide recipes for the requested meals. Each recipe should include a name, a list of ingredients with amounts and units, step-by-step instructions, and an estimated cost for the ingredients for that specific recipe. The sum of all recipe costs should be close to the total_estimated_cost. Calculate the total_estimated_cost for the entire plan.
+${settings.preferredStores && settings.preferredStores.length > 0 ? `Assume ingredients are purchased from one of these stores: ${settings.preferredStores.join(', ')} when estimating costs.` : ''}
+Provide a detailed response in JSON format. For each day, provide recipes for the requested meals. Each recipe must include a name, a list of ingredients with amounts and units, step-by-step instructions, an estimated cost, prep_time_minutes, cook_time_minutes, and total_calories. The sum of all recipe costs should be close to the total_estimated_cost. Calculate the total_estimated_cost for the entire plan.
 Ensure the output matches the provided JSON schema. The "day" property should be the day of the week (e.g., Monday, Tuesday).
 `;
 };
@@ -122,12 +126,14 @@ User Settings:
 - Budget: $${settings.budget} for ${settings.days} days for ${settings.people} people.
 - Preferences: ${settings.preferences || 'None'}
 - Crockpot meals prioritized: ${settings.wantsCrockpot}
+- Preferred Stores: ${settings.preferredStores?.join(', ') || 'Any'}
+
 
 Current Meal Plan (for context, do not repeat it):
 ${JSON.stringify(currentPlan, null, 2)}
 
 Please provide ONLY the JSON for the new recipe for ${dayToReplace}'s ${mealTypeToReplace}.
-The recipe should not be something already present in the meal plan.
+The recipe should not be something already present in the meal plan. It must include all fields: name, ingredients, instructions, estimated_cost, prep_time_minutes, cook_time_minutes, and total_calories.
 `;
     
     const response = await ai.models.generateContent({
@@ -202,41 +208,41 @@ Provide the response as a JSON object with a single key "shopping_list" which is
 };
 
 export const comparePrices = async (items: string[], zipCode: string): Promise<ComparisonResult[]> => {
-    const prompt = `
-For the following shopping list items, find the estimated prices at three major grocery stores (like Walmart, Kroger, Safeway, or others) near the zip code ${zipCode}.
-If a specific store is not available, choose another popular one.
-Return the data in a structured format. Do not include any commentary.
+    // Step 1: Get the price information from the web using Google Search grounding.
+    const searchPrompt = `
+Find the estimated prices for the following shopping list items at three popular grocery stores near the zip code ${zipCode}.
+Please provide the store name and price for each item in a clear, easy-to-read format.
 
 Items:
 - ${items.join('\n- ')}
 `;
 
-    const response = await ai.models.generateContent({
+    const searchResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: prompt,
+        contents: searchPrompt,
         config: {
             tools: [{googleSearch: {}}],
         }
     });
 
-    const followUpPrompt = `
-Here is some information from Google Search. Based on this, please provide a price comparison for the items: ${items.join(', ')}.
-Search results:
-${response.text}
+    const rawText = searchResponse.text;
+    if (!rawText || rawText.trim() === '') {
+        throw new Error("The AI could not find any price information. The area might not have enough data.");
+    }
 
-Please format your response as a JSON array of objects, where each object represents an item and has two keys: "itemName" (string) and "prices" (an array of objects with "store" and "price" keys).
-Example format:
-[
-  {
-    "itemName": "Chicken Breast",
-    "prices": [
-      { "store": "Walmart", "price": 8.99 },
-      { "store": "Kroger", "price": 9.49 }
-    ]
-  }
-]
+    // Step 2: Take the text response and structure it into JSON.
+    const structuringPrompt = `
+Based on the following text, extract the price comparison information and format it as a valid JSON array.
+Each object in the array should represent an item and have two keys: "itemName" (string) and "prices" (an array of objects with "store" (string) and "price" (number) keys).
+Ignore any introductory text or summaries. Provide only the JSON array.
+
+Text to parse:
+"""
+${rawText}
+"""
 `;
-
+    
+    // Define the schema for the expected JSON output
     const priceSchema = {
         type: Type.OBJECT,
         properties: {
@@ -263,7 +269,7 @@ Example format:
     
     const structuredResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: followUpPrompt,
+        contents: structuringPrompt,
         config: {
             responseMimeType: "application/json",
             responseSchema: comparisonResultSchema
@@ -275,7 +281,122 @@ Example format:
         return JSON.parse(jsonText) as ComparisonResult[];
     } catch (e) {
         console.error("Failed to parse Gemini response for price comparison:", e);
-        console.error("Raw response:", structuredResponse.text);
-        throw new Error("The AI returned invalid price data. Please try again.");
+        console.error("Raw response from structuring call:", structuredResponse.text);
+        throw new Error("The AI returned invalid price data after searching. Please try again.");
+    }
+};
+
+export const convertUnits = async (amount: string, fromUnit: string, toUnit: string, ingredient: string): Promise<string> => {
+    const prompt = `Convert ${amount} ${fromUnit} of ${ingredient} to ${toUnit}. Provide only the resulting string, for example: "250 grams" or "approx. 1.5 cups".`;
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt
+    });
+
+    // Directly return the text response from the model
+    return response.text.trim();
+};
+
+export const generateExportableList = async (bestStoreName: string, items: {itemName: string, price: number}[]): Promise<string> => {
+    const itemsText = items.map(item => `- ${item.itemName}: $${item.price.toFixed(2)}`).join('\n');
+    const totalCost = items.reduce((sum, item) => sum + item.price, 0);
+
+    const prompt = `
+You are a helpful shopping assistant. Your task is to take a list of grocery items for a specific store and format it into a highly-organized, human-friendly shopping list that someone can easily use in the store.
+
+Store Name: ${bestStoreName}
+Total Estimated Cost: $${totalCost.toFixed(2)}
+
+Items to purchase:
+${itemsText}
+
+Please format the list with the following criteria:
+1.  Group items by common grocery store categories (e.g., Produce, Dairy & Eggs, Meat & Seafood, Bakery, Pantry Staples, Frozen Foods, Beverages, Household).
+2.  Within each category, list the items clearly.
+3.  Start with a clear title like "Your Shopping List for [Store Name]".
+4.  End with the "Total Estimated Cost".
+5.  Keep the format clean and easy to read on a mobile phone. Do not use JSON or any code formatting. Use clear headings for categories.
+
+Example format:
+
+Your Shopping List for [Store Name]
+================================
+
+**Produce**
+- [Item Name]: $[Price]
+- [Item Name]: $[Price]
+
+**Dairy & Eggs**
+- [Item Name]: $[Price]
+
+... and so on for other categories.
+
+================================
+Total Estimated Cost: $[Total Price]
+`;
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+    });
+
+    return response.text.trim();
+};
+
+const simpleRecipeSchema = {
+    type: Type.OBJECT,
+    properties: {
+        name: { type: Type.STRING },
+        description: { type: Type.STRING, description: "A brief, enticing description of the dish." },
+        ingredients_used: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "A list of the key ingredients used from the provided list."
+        }
+    },
+    required: ["name", "description", "ingredients_used"]
+};
+
+const pantryRecipesResponseSchema = {
+    type: Type.OBJECT,
+    properties: {
+        recipes: {
+            type: Type.ARRAY,
+            items: simpleRecipeSchema
+        }
+    },
+    required: ["recipes"]
+};
+
+export const generatePantryRecipes = async (pantryItems: string[], mealPlanIngredients: string[]): Promise<SimpleRecipe[]> => {
+    const prompt = `
+I have the following ingredients available:
+- Pantry Staples: ${pantryItems.join(', ')}
+- Other ingredients from my meal plan: ${mealPlanIngredients.join(', ')}
+
+Based ONLY on this list of available ingredients, suggest 2-3 simple and creative recipes (like snacks, side dishes, or simple meals) that I could make to use up what I have.
+For each recipe, provide a name, a short description, and list the key ingredients used from the list I provided.
+Do not suggest recipes that require ingredients not on my list.
+
+Provide the response as a JSON object with a single key "recipes" which is an array of recipe objects.
+`;
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: pantryRecipesResponseSchema
+        },
+    });
+
+    try {
+        const jsonText = response.text.trim();
+        const parsed = JSON.parse(jsonText);
+        return parsed.recipes as SimpleRecipe[];
+    } catch (e) {
+        console.error("Failed to parse Gemini response for pantry recipes:", e);
+        console.error("Raw response:", response.text);
+        throw new Error("The AI returned invalid recipe suggestions. Please try again.");
     }
 };
