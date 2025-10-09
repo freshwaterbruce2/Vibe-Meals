@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Recipe } from '../types';
 
 interface RecipeCardProps {
-  title: string;
+  title?: string;
   recipe: Recipe;
-  onReplace: () => void;
-  isReplacing: boolean;
+  onReplace?: () => void;
+  isReplacing?: boolean;
 }
 
 const DetailItem: React.FC<{ icon: string; value: string | number | undefined; label: string }> = ({ icon, value, label }) => {
@@ -48,8 +48,8 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ title, recipe, onReplace, isRep
   return (
     <div style={cardStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h4 style={{ margin: 0, fontSize: '1.2rem', color: '#8A2BE2' }}>{title}</h4>
-        <span style={{fontSize: '0.9rem', fontWeight: 500, backgroundColor: 'rgba(138, 43, 226, 0.1)', color: '#8A2BE2', padding: '4px 8px', borderRadius: '4px'}}>
+        {title && <h4 style={{ margin: 0, fontSize: '1.2rem', color: '#8A2BE2' }}>{title}</h4>}
+        <span style={{fontSize: '0.9rem', fontWeight: 500, backgroundColor: 'rgba(138, 43, 226, 0.1)', color: '#8A2BE2', padding: '4px 8px', borderRadius: '4px', marginLeft: title ? 'auto' : '0'}}>
             ~${recipe.estimated_cost.toFixed(2)}
         </span>
       </div>
@@ -87,14 +87,16 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ title, recipe, onReplace, isRep
         </>
       )}
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: onReplace ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 'auto', paddingTop: '10px' }}>
         <button onClick={() => setIsExpanded(!isExpanded)} style={secondaryButtonStyle}>
             {isExpanded ? 'Show Less' : 'Show Details'}
         </button>
-        <button onClick={onReplace} disabled={isReplacing} style={{...primaryButtonStyle, opacity: isReplacing ? 0.6 : 1, position: 'relative' }}>
-          {isReplacing && <Spinner />}
-          <span style={{visibility: isReplacing ? 'hidden' : 'visible'}}>Replace</span>
-        </button>
+        {onReplace && (
+            <button onClick={onReplace} disabled={isReplacing} style={{...primaryButtonStyle, opacity: isReplacing ? 0.6 : 1, position: 'relative' }}>
+            {isReplacing && <Spinner />}
+            <span style={{visibility: isReplacing ? 'hidden' : 'visible'}}>Replace</span>
+            </button>
+        )}
       </div>
     </div>
   );

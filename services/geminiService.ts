@@ -403,3 +403,42 @@ Provide the response as a JSON object with a single key "recipes" which is an ar
         throw new Error("The AI returned invalid recipe suggestions. Please try again.");
     }
 };
+
+const recipeSearchResponseSchema = {
+    type: Type.OBJECT,
+    properties: {
+        recipes: {
+            type: Type.ARRAY,
+            items: recipeSchema
+        }
+    },
+    required: ["recipes"]
+};
+
+export const searchRecipes = async (query: string): Promise<Recipe[]> => {
+    const prompt = `
+Find 3 diverse recipes based on the following search query: "${query}".
+The recipes should be suitable for home cooking.
+For each recipe, provide a detailed response in JSON format. Each recipe must include a name, a list of ingredients with amounts and units, step-by-step instructions, an estimated cost, prep_time_minutes, cook_time_minutes, and nutritional estimates (total_calories, protein_grams, carbs_grams, fat_grams).
+Ensure the output is a JSON object with a single key "recipes", which is an array of these recipe objects.
+`;
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: recipeSearchResponseSchema
+        },
+    });
+
+    try {
+        const jsonText = response.text.trim();
+        const parsed = JSON.parse(jsonText);
+        return parsed.recipes as Recipe[];
+    } catch (e) {
+        console.error("Failed to parse Gemini response for recipe search:", e);
+        console.error("Raw response:", response.text);
+        throw new Error("The AI returned invalid recipes. Please try a different search term.");
+    }
+};

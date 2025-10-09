@@ -7,8 +7,9 @@ import ErrorDisplay from './components/ErrorDisplay';
 import ShoppingList from './components/ShoppingList';
 import PantryTracker from './components/PantryTracker';
 import SavedPlansModal from './components/SavedPlansModal';
-import { MealPlanSettings, MealPlanResponse } from './types';
-import { generateMealPlan, replaceRecipe as apiReplaceRecipe } from './services/geminiService';
+import RecipeSearch from './components/RecipeSearch';
+import { MealPlanSettings, MealPlanResponse, Recipe } from './types';
+import { generateMealPlan, replaceRecipe as apiReplaceRecipe, searchRecipes as apiSearchRecipes } from './services/geminiService';
 
 interface SavedPlan {
     name: string;
@@ -26,6 +27,9 @@ const App: React.FC = () => {
     const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
     const [isPlansModalVisible, setIsPlansModalVisible] = useState(false);
     const [pantryItems, setPantryItems] = useState<string[]>([]);
+    const [searchResults, setSearchResults] = useState<Recipe[] | null>(null);
+    const [isSearching, setIsSearching] = useState<boolean>(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
 
     useEffect(() => {
         try {
@@ -149,6 +153,20 @@ const App: React.FC = () => {
         }
     };
 
+    const handleRecipeSearch = async (query: string) => {
+        setIsSearching(true);
+        setSearchError(null);
+        setSearchResults(null);
+        try {
+            const results = await apiSearchRecipes(query);
+            setSearchResults(results);
+        } catch (err: any) {
+            setSearchError(err.message || 'An unknown error occurred while searching.');
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', minHeight: '100vh' }}>
             <Header onShowPlans={() => setIsPlansModalVisible(true)} hasPlans={savedPlans.length > 0} />
@@ -193,6 +211,13 @@ const App: React.FC = () => {
                     />
                 </div>
             )}
+
+            <RecipeSearch 
+                onSearch={handleRecipeSearch}
+                searchResults={searchResults}
+                isSearching={isSearching}
+                searchError={searchError}
+            />
             
             {isPlansModalVisible && (
                 <SavedPlansModal 
