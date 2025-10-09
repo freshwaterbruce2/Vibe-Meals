@@ -8,6 +8,7 @@ import ShoppingList from './components/ShoppingList';
 import PantryTracker from './components/PantryTracker';
 import SavedPlansModal from './components/SavedPlansModal';
 import RecipeSearch from './components/RecipeSearch';
+import AboutPage from './components/AboutPage';
 import { MealPlanSettings, MealPlanResponse, Recipe } from './types';
 import { generateMealPlan, replaceRecipe as apiReplaceRecipe, searchRecipes as apiSearchRecipes } from './services/geminiService';
 
@@ -30,6 +31,7 @@ const App: React.FC = () => {
     const [searchResults, setSearchResults] = useState<Recipe[] | null>(null);
     const [isSearching, setIsSearching] = useState<boolean>(false);
     const [searchError, setSearchError] = useState<string | null>(null);
+    const [currentView, setCurrentView] = useState<'main' | 'about'>('main');
 
     useEffect(() => {
         try {
@@ -143,6 +145,7 @@ const App: React.FC = () => {
         setMealPlan(planToLoad.mealPlan);
         setIsPlansModalVisible(false);
         setIsFormVisible(false);
+        setCurrentView('main');
     };
 
     const handleDeletePlan = (planId: number) => {
@@ -166,58 +169,79 @@ const App: React.FC = () => {
             setIsSearching(false);
         }
     };
+    
+    const handleGoHome = () => {
+        setCurrentView('main');
+        // Reset state when going home, but keep saved plans and pantry
+        setMealPlan(null);
+        setSettings(null);
+        setError(null);
+        setIsFormVisible(false);
+        setLoadingState('idle');
+    }
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', minHeight: '100vh' }}>
-            <Header onShowPlans={() => setIsPlansModalVisible(true)} hasPlans={savedPlans.length > 0} />
-            
-            {!isFormVisible && !mealPlan && loadingState !== 'generating' && (
-                <div style={{ textAlign: 'center', padding: '80px 20px', color: 'white' }}>
-                    <h1 style={{ fontSize: '3.5rem', fontWeight: 700, textShadow: '0 2px 4px rgba(0,0,0,0.2)', marginBottom: '20px' }}>
-                        Effortless meal planning,
-                        <br />
-                        tailored to you.
-                    </h1>
-                    <p style={{ fontSize: '1.25rem', marginBottom: '40px', opacity: 0.9 }}>
-                        Save time, eat well, and stay on budget with your personal AI chef.
-                    </p>
-                    <button onClick={() => setIsFormVisible(true)} style={heroButtonStyle}>
-                        Start Planning
-                    </button>
-                </div>
-            )}
-
-            {isFormVisible && !mealPlan && loadingState !== 'generating' && (
-                <BudgetSetup onGenerate={handleGenerateMealPlan} disabled={loadingState === 'generating'} />
-            )}
-
-            {loadingState === 'generating' && <Loader message="Crafting your personalized meal plan..." />}
-            {error && loadingState === 'error' && <ErrorDisplay error={error} onRetry={handleRetry} />}
-            
-            {mealPlan && settings && (
-                 <div style={{marginTop: '40px', display: 'flex', flexDirection: 'column', gap: '40px'}}>
-                    <MealPlanDisplay 
-                        mealPlanResponse={mealPlan} 
-                        onReplaceRecipe={handleReplaceRecipe}
-                        loadingState={loadingState}
-                        budget={settings.budget}
-                        onSavePlan={handleSavePlan}
-                    />
-                    <ShoppingList mealPlan={mealPlan} pantryItems={pantryItems} />
-                    <PantryTracker 
-                        pantryItems={pantryItems} 
-                        onUpdatePantry={handlePantryUpdate} 
-                        mealPlan={mealPlan}
-                    />
-                </div>
-            )}
-
-            <RecipeSearch 
-                onSearch={handleRecipeSearch}
-                searchResults={searchResults}
-                isSearching={isSearching}
-                searchError={searchError}
+            <Header 
+                onShowPlans={() => setIsPlansModalVisible(true)} 
+                hasPlans={savedPlans.length > 0}
+                onShowAbout={() => setCurrentView('about')}
+                onGoHome={handleGoHome}
             />
+
+            {currentView === 'about' && <AboutPage onBack={() => setCurrentView('main')} />}
+            
+            {currentView === 'main' && (
+                <>
+                    {!isFormVisible && !mealPlan && loadingState !== 'generating' && (
+                        <div style={{ textAlign: 'center', padding: '80px 20px', color: 'white' }}>
+                            <h1 style={{ fontSize: '3.5rem', fontWeight: 700, textShadow: '0 2px 4px rgba(0,0,0,0.2)', marginBottom: '20px' }}>
+                                Effortless meal planning,
+                                <br />
+                                tailored to you.
+                            </h1>
+                            <p style={{ fontSize: '1.25rem', marginBottom: '40px', opacity: 0.9 }}>
+                                Save time, eat well, and stay on budget with your personal AI chef.
+                            </p>
+                            <button onClick={() => setIsFormVisible(true)} style={heroButtonStyle}>
+                                Start Planning
+                            </button>
+                        </div>
+                    )}
+
+                    {isFormVisible && !mealPlan && loadingState !== 'generating' && (
+                        <BudgetSetup onGenerate={handleGenerateMealPlan} disabled={loadingState === 'generating'} />
+                    )}
+
+                    {loadingState === 'generating' && <Loader message="Crafting your personalized meal plan..." />}
+                    {error && loadingState === 'error' && <ErrorDisplay error={error} onRetry={handleRetry} />}
+                    
+                    {mealPlan && settings && (
+                         <div style={{marginTop: '40px', display: 'flex', flexDirection: 'column', gap: '40px'}}>
+                            <MealPlanDisplay 
+                                mealPlanResponse={mealPlan} 
+                                onReplaceRecipe={handleReplaceRecipe}
+                                loadingState={loadingState}
+                                budget={settings.budget}
+                                onSavePlan={handleSavePlan}
+                            />
+                            <ShoppingList mealPlan={mealPlan} pantryItems={pantryItems} />
+                            <PantryTracker 
+                                pantryItems={pantryItems} 
+                                onUpdatePantry={handlePantryUpdate} 
+                                mealPlan={mealPlan}
+                            />
+                        </div>
+                    )}
+
+                    <RecipeSearch 
+                        onSearch={handleRecipeSearch}
+                        searchResults={searchResults}
+                        isSearching={isSearching}
+                        searchError={searchError}
+                    />
+                </>
+            )}
             
             {isPlansModalVisible && (
                 <SavedPlansModal 
