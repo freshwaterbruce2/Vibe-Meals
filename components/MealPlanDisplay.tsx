@@ -1,5 +1,5 @@
-import React from 'react';
-import { MealPlanResponse } from '../types';
+import React, { useMemo, useState } from 'react';
+import { MealPlanResponse, DayPlan } from '../types';
 import RecipeCard from './RecipeCard';
 
 interface MealPlanDisplayProps {
@@ -51,7 +51,39 @@ const BudgetProgressBar: React.FC<{ budget: number, cost: number }> = ({ budget,
 
 const MealPlanDisplay: React.FC<MealPlanDisplayProps> = ({ mealPlanResponse, onReplaceRecipe, loadingState, budget, onSavePlan }) => {
   const { days, total_estimated_cost } = mealPlanResponse;
-  
+  const [sortBy, setSortBy] = useState('day');
+
+  const getDayTotal = (dayPlan: DayPlan, property: 'estimated_cost' | 'prep_time_minutes' | 'cook_time_minutes'): number => {
+    let total = 0;
+    const meals = [dayPlan.breakfast, dayPlan.lunch, dayPlan.dinner];
+    meals.forEach(meal => {
+        if (meal && meal[property]) {
+            total += meal[property] as number;
+        }
+    });
+    return total;
+  };
+
+  const weekdayOrder = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+  const sortedDays = useMemo(() => {
+    const daysCopy = [...days];
+
+    switch (sortBy) {
+        case 'cost-asc':
+            return daysCopy.sort((a, b) => getDayTotal(a, 'estimated_cost') - getDayTotal(b, 'estimated_cost'));
+        case 'cost-desc':
+            return daysCopy.sort((a, b) => getDayTotal(b, 'estimated_cost') - getDayTotal(a, 'estimated_cost'));
+        case 'prep':
+            return daysCopy.sort((a, b) => getDayTotal(a, 'prep_time_minutes') - getDayTotal(b, 'prep_time_minutes'));
+        case 'cook':
+             return daysCopy.sort((a, b) => getDayTotal(a, 'cook_time_minutes') - getDayTotal(b, 'cook_time_minutes'));
+        case 'day':
+        default:
+             return daysCopy.sort((a, b) => weekdayOrder.indexOf(a.day.toLowerCase()) - weekdayOrder.indexOf(b.day.toLowerCase()));
+    }
+  }, [days, sortBy]);
+
   return (
     <div>
       <div style={glassCardStyle}>
@@ -62,8 +94,21 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = ({ mealPlanResponse, onR
         <BudgetProgressBar budget={budget} cost={total_estimated_cost} />
       </div>
 
-      <h2 style={{fontSize: '2rem', color: 'white', textShadow: '0 1px 3px rgba(0,0,0,0.1)', textAlign: 'center', marginBottom: '30px'}}>Your Meal Plan</h2>
-      {days.map(dayPlan => (
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '1rem'}}>
+          <h2 style={{fontSize: '2rem', color: 'white', textShadow: '0 1px 3px rgba(0,0,0,0.1)', margin: 0}}>Your Meal Plan</h2>
+          <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+              <label htmlFor="sort-plan" style={{color: 'white', fontWeight: 500}}>Sort by:</label>
+              <select id="sort-plan" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
+                  <option value="day">Day of the Week</option>
+                  <option value="cost-asc">Cost (Low to High)</option>
+                  <option value="cost-desc">Cost (High to Low)</option>
+                  <option value="prep">Prep Time (Shortest)</option>
+                  <option value="cook">Cook Time (Shortest)</option>
+              </select>
+          </div>
+      </div>
+      
+      {sortedDays.map(dayPlan => (
         <div key={dayPlan.day} style={{ marginBottom: '40px' }}>
           <h3 style={{ textTransform: 'capitalize', borderBottom: '2px solid rgba(255,255,255,0.5)', paddingBottom: '8px', marginBottom: '24px', fontSize: '1.5rem', color: 'white' }}>{dayPlan.day}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
@@ -99,5 +144,15 @@ const saveButtonStyle: React.CSSProperties = {
   transition: 'background-color 0.2s ease',
 };
 
+const selectStyle: React.CSSProperties = {
+    padding: '8px 12px',
+    borderRadius: '8px',
+    border: '1px solid rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    color: 'white',
+    fontSize: '16px',
+    backdropFilter: 'blur(5px)',
+    fontWeight: 500
+};
 
 export default MealPlanDisplay;
