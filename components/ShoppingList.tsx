@@ -76,8 +76,8 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ mealPlan, pantryItems }) =>
     }
   };
 
+  // FIX: The type of `items` was inferred as `unknown` because `useMemo` for `categorizedList` could return a plain `{}`, causing `Object.entries` to produce a weakly-typed array. By removing the redundant `if (shoppingList.length === 0)` check, `reduce` correctly handles an empty array and maintains the `Record<string, ShoppingListItem[]>` type, resolving the `items.map` error.
   const categorizedList = useMemo(() => {
-    if (shoppingList.length === 0) return {};
     return shoppingList.reduce((acc, item) => {
       const category = item.category || 'Uncategorized';
       if (!acc[category]) {

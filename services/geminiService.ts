@@ -31,8 +31,11 @@ const recipeSchema = {
         prep_time_minutes: { type: Type.NUMBER },
         cook_time_minutes: { type: Type.NUMBER },
         total_calories: { type: Type.NUMBER },
+        protein_grams: { type: Type.NUMBER },
+        carbs_grams: { type: Type.NUMBER },
+        fat_grams: { type: Type.NUMBER },
     },
-    required: ["name", "ingredients", "instructions", "estimated_cost", "prep_time_minutes", "cook_time_minutes", "total_calories"],
+    required: ["name", "ingredients", "instructions", "estimated_cost", "prep_time_minutes", "cook_time_minutes", "total_calories", "protein_grams", "carbs_grams", "fat_grams"],
 };
 
 const dayPlanSchema = {
@@ -66,7 +69,7 @@ Dietary preferences and restrictions: ${settings.preferences || 'None'}.
 Plan for the following meals: ${settings.mealTypes.join(', ')}.
 ${settings.wantsCrockpot ? 'Prioritize crockpot-friendly meals where possible, especially for dinner.' : ''}
 ${settings.preferredStores && settings.preferredStores.length > 0 ? `Assume ingredients are purchased from one of these stores: ${settings.preferredStores.join(', ')} when estimating costs.` : ''}
-Provide a detailed response in JSON format. For each day, provide recipes for the requested meals. Each recipe must include a name, a list of ingredients with amounts and units, step-by-step instructions, an estimated cost, prep_time_minutes, cook_time_minutes, and total_calories. The sum of all recipe costs should be close to the total_estimated_cost. Calculate the total_estimated_cost for the entire plan.
+Provide a detailed response in JSON format. For each day, provide recipes for the requested meals. Each recipe must include a name, a list of ingredients with amounts and units, step-by-step instructions, an estimated cost, prep_time_minutes, cook_time_minutes, and nutritional estimates (total_calories, protein_grams, carbs_grams, fat_grams). The sum of all recipe costs should be close to the total_estimated_cost. Calculate the total_estimated_cost for the entire plan.
 Ensure the output matches the provided JSON schema. The "day" property should be the day of the week (e.g., Monday, Tuesday).
 `;
 };
@@ -133,7 +136,7 @@ Current Meal Plan (for context, do not repeat it):
 ${JSON.stringify(currentPlan, null, 2)}
 
 Please provide ONLY the JSON for the new recipe for ${dayToReplace}'s ${mealTypeToReplace}.
-The recipe should not be something already present in the meal plan. It must include all fields: name, ingredients, instructions, estimated_cost, prep_time_minutes, cook_time_minutes, and total_calories.
+The recipe should not be something already present in the meal plan. It must include all fields: name, ingredients, instructions, estimated_cost, prep_time_minutes, cook_time_minutes, total_calories, protein_grams, carbs_grams, and fat_grams.
 `;
     
     const response = await ai.models.generateContent({

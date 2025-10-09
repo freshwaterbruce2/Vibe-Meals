@@ -24,6 +24,9 @@ export interface Recipe {
   prep_time_minutes?: number;
   cook_time_minutes?: number;
   total_calories?: number;
+  protein_grams?: number;
+  carbs_grams?: number;
+  fat_grams?: number;
 }
 
 export interface DayPlan {

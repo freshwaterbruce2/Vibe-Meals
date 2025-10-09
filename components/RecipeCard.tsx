@@ -9,7 +9,7 @@ interface RecipeCardProps {
 }
 
 const DetailItem: React.FC<{ icon: string; value: string | number | undefined; label: string }> = ({ icon, value, label }) => {
-    if (!value) return null;
+    if (value === undefined || value === null) return null;
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: '#555' }}>
             <span style={{ fontSize: '1.2rem' }}>{icon}</span>
@@ -20,6 +20,16 @@ const DetailItem: React.FC<{ icon: string; value: string | number | undefined; l
         </div>
     );
 };
+
+const NutritionItem: React.FC<{ label: string; value: number | undefined; color: string }> = ({ label, value, color }) => {
+    if (value === undefined || value === null) return null;
+    return (
+        <div style={{ textAlign: 'center', fontSize: '0.85rem' }}>
+            <div style={{ fontSize: '1.1rem', fontWeight: 600, color }}>{Math.round(value)}g</div>
+            <div style={{ color: '#6c757d' }}>{label}</div>
+        </div>
+    )
+}
 
 const RecipeCard: React.FC<RecipeCardProps> = ({ title, recipe, onReplace, isReplacing }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -32,6 +42,8 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ title, recipe, onReplace, isRep
       </div>
     );
   }
+  
+  const hasNutrition = recipe.protein_grams !== undefined || recipe.carbs_grams !== undefined || recipe.fat_grams !== undefined;
 
   return (
     <div style={cardStyle}>
@@ -43,10 +55,19 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ title, recipe, onReplace, isRep
       </div>
       <p style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 600, color: '#333' }}>{recipe.name}</p>
 
-      <div style={{ display: 'flex', justifyContent: 'space-around', gap: '10px', padding: '10px 0', borderTop: '1px solid #eee', borderBottom: '1px solid #eee', marginBottom: '16px', flexWrap: 'wrap' }}>
-          <DetailItem icon="🕒" value={recipe.prep_time_minutes} label="min prep" />
-          <DetailItem icon="🔥" value={recipe.cook_time_minutes} label="min cook" />
-          <DetailItem icon="📊" value={recipe.total_calories} label="calories" />
+      <div style={{ borderTop: '1px solid #eee', borderBottom: '1px solid #eee', marginBottom: '16px', padding: '10px 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-around', gap: '10px', flexWrap: 'wrap' }}>
+            <DetailItem icon="🕒" value={recipe.prep_time_minutes} label="min prep" />
+            <DetailItem icon="🔥" value={recipe.cook_time_minutes} label="min cook" />
+            <DetailItem icon="📊" value={recipe.total_calories} label="calories" />
+        </div>
+        {hasNutrition && (
+            <div style={{ display: 'flex', justifyContent: 'space-around', gap: '10px', flexWrap: 'wrap', paddingTop: '10px', marginTop: '10px', borderTop: '1px solid #f5f5f5' }}>
+                <NutritionItem label="Protein" value={recipe.protein_grams} color="#3b82f6" />
+                <NutritionItem label="Carbs" value={recipe.carbs_grams} color="#f59e0b" />
+                <NutritionItem label="Fat" value={recipe.fat_grams} color="#ef4444" />
+            </div>
+        )}
       </div>
 
       {isExpanded && (
