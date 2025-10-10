@@ -60,6 +60,16 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ mealPlan, pantryItems }) =>
     );
   };
   
+  const handleToggleAll = (check: boolean) => {
+      setShoppingList(prevList => prevList.map(item => ({ ...item, checked: check })));
+  };
+  
+  const handleClearPantryItems = () => {
+      if (window.confirm("Are you sure you want to remove all items marked as 'in pantry' from this list?")) {
+          setShoppingList(prevList => prevList.filter(item => !item.checked));
+      }
+  };
+
   const handleComparePrices = async (zipCode: string) => {
     setIsComparing(true);
     setError(null);
@@ -76,16 +86,18 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ mealPlan, pantryItems }) =>
     }
   };
 
-  // FIX: The type of `items` was inferred as `unknown` because `useMemo` for `categorizedList` could return a plain `{}`, causing `Object.entries` to produce a weakly-typed array. By removing the redundant `if (shoppingList.length === 0)` check, `reduce` correctly handles an empty array and maintains the `Record<string, ShoppingListItem[]>` type, resolving the `items.map` error.
   const categorizedList = useMemo(() => {
-    return shoppingList.reduce((acc, item) => {
-      const category = item.category || 'Uncategorized';
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push(item);
-      return acc;
-    }, {} as Record<string, ShoppingListItem[]>);
+    // FIX: Replaced reduce with a for...of loop for more reliable type inference.
+    // The previous implementation with reduce could lead to `items` being inferred as `unknown`.
+    const grouped: Record<string, ShoppingListItem[]> = {};
+    for (const item of shoppingList) {
+        const category = item.category || 'Uncategorized';
+        if (!grouped[category]) {
+            grouped[category] = [];
+        }
+        grouped[category].push(item);
+    }
+    return grouped;
   }, [shoppingList]);
   
   const selectedItemCount = shoppingList.filter(item => !item.checked).length;
@@ -110,16 +122,22 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ mealPlan, pantryItems }) =>
       
       {Object.keys(categorizedList).length > 0 && (
         <>
-        <p style={{color: '#6c757d', marginTop: 0}}>Here's your consolidated shopping list. Items in your pantry have been unchecked automatically.</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', paddingBottom: '20px', borderBottom: '1px solid #e0e0e0', marginBottom: '20px' }}>
+            <p style={{color: '#6c757d', margin: 0, flexBasis: '100%', maxWidth: 'calc(100% - 350px)'}}>Items in your pantry are de-selected (unchecked with a line-through).</p>
+            <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+                <button onClick={() => handleToggleAll(false)} style={globalActionButtonStyle} title="Select all items to buy">Select All</button>
+                <button onClick={() => handleToggleAll(true)} style={globalActionButtonStyle} title="Deselect all items">Deselect All</button>
+                <button onClick={handleClearPantryItems} style={{...globalActionButtonStyle, backgroundColor: '#c82333'}} title="Remove items already in your pantry from the list">Clear Pantry Items</button>
+            </div>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '24px' }}>
-          {/* FIX: Use non-destructured arguments in sort to prevent type inference issues. */}
           {Object.entries(categorizedList).sort((a, b) => a[0].localeCompare(b[0])).map(([category, items]) => (
             <div key={category}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e0e0e0', paddingBottom: '8px', marginBottom: '12px' }}>
                   <h4 style={{ textTransform: 'capitalize', margin: 0, color: '#555' }}>{category}</h4>
                   <div style={{display: 'flex', gap: '8px'}}>
-                      <button onClick={() => handleToggleCategory(category, false)} style={categoryButtonStyle} title={`Deselect all in ${category}`}>None</button>
-                      <button onClick={() => handleToggleCategory(category, true)} style={categoryButtonStyle} title={`Select all in ${category}`}>All</button>
+                      <button onClick={() => handleToggleCategory(category, false)} style={categoryButtonStyle} title={`Select all in ${category}`}>Select All</button>
+                      <button onClick={() => handleToggleCategory(category, true)} style={categoryButtonStyle} title={`Deselect all in ${category}`}>Deselect All</button>
                   </div>
               </div>
               {items.map(item => (
@@ -183,6 +201,18 @@ const categoryButtonStyle: React.CSSProperties = {
     cursor: 'pointer',
     color: '#555',
     transition: 'background-color 0.2s ease, border-color 0.2s ease',
+};
+
+const globalActionButtonStyle: React.CSSProperties = {
+    padding: '8px 12px',
+    border: 'none',
+    borderRadius: '6px',
+    backgroundColor: '#6c757d',
+    color: 'white',
+    fontSize: '13px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'background-color 0.2s ease',
 };
 
 
