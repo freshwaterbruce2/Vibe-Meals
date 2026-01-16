@@ -14,7 +14,7 @@ const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
 
             <h3 style={subtitleStyle}>How It Works</h3>
             <p style={paragraphStyle}>
-                AuraChef leverages the power of Google's advanced Gemini AI to create customized meal plans based on your unique needs. Simply provide your weekly budget, the number of people you're cooking for, and any dietary preferences, and our AI will craft a delicious and cost-effective plan just for you.
+                AuraChef leverages the power of Google&apos;s advanced Gemini AI to create customized meal plans based on your unique needs. Simply provide your weekly budget, the number of people you&apos;re cooking for, and any dietary preferences, and our AI will craft a delicious and cost-effective plan just for you.
             </p>
 
             <h3 style={subtitleStyle}>Key Features</h3>
@@ -23,12 +23,12 @@ const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
                 <li><strong>Smart Shopping Lists:</strong> Automatically generate organized, categorized shopping lists.</li>
                 <li><strong>Local Price Comparison:</strong> Find the best grocery prices in your area to maximize savings.</li>
                 <li><strong>Pantry Tracking:</strong> Keep track of what you already have to reduce waste and smarten up your shopping.</li>
-                <li><strong>Recipe Discovery:</strong> Instantly replace any meal you don't like or search for new recipe ideas.</li>
+                <li><strong>Recipe Discovery:</strong> Instantly replace any meal you don&apos;t like or search for new recipe ideas.</li>
                 <li><strong>Save & Load:</strong> Keep your favorite meal plans handy for future use.</li>
             </ul>
 
             <p style={paragraphStyle}>
-                We believe that everyone deserves to eat well without the hassle. Whether you're a busy professional, a family on a budget, or just looking for new culinary inspiration, AuraChef is here to help you save time, eat well, and stay on budget.
+                We believe that everyone deserves to eat well without the hassle. Whether you&apos;re a busy professional, a family on a budget, or just looking for new culinary inspiration, AuraChef is here to help you save time, eat well, and stay on budget.
             </p>
             <div style={{ textAlign: 'center', marginTop: '32px' }}>
                  <button onClick={onBack} style={backButtonStyle}>
