@@ -1,8 +1,24 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { MealPlanSettings, MealPlanResponse, ShoppingListItem, ComparisonResult, Recipe, SimpleRecipe } from '../types';
 
-// FIX: Initialize GoogleGenAI with a named apiKey parameter.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Get API key from environment variable
+const API_KEY = process.env.GEMINI_API_KEY || process.env.API_KEY;
+
+// Validate API key exists
+if (!API_KEY) {
+    console.error('GEMINI_API_KEY is not configured. Please add it to your .env file.');
+}
+
+// Initialize GoogleGenAI - will be null if no API key
+const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
+
+// Helper to check if AI is available
+const ensureAI = (): GoogleGenAI => {
+    if (!ai) {
+        throw new Error('AI service is not configured. Please add GEMINI_API_KEY to your .env file.');
+    }
+    return ai;
+};
 
 const ingredientSchema = {
     type: Type.OBJECT,
@@ -88,10 +104,12 @@ export const generateMealPlan = async (settings: MealPlanSettings): Promise<Meal
     const prompt = generatePrompt(settings);
     
     // Create a dynamic schema based on selected meals
-    const dynamicDayPlanSchema = { ...dayPlanSchema, properties: {...dayPlanSchema.properties} };
-    if (!settings.mealTypes.includes('Breakfast')) delete (dynamicDayPlanSchema.properties as any).breakfast;
-    if (!settings.mealTypes.includes('Lunch')) delete (dynamicDayPlanSchema.properties as any).lunch;
-    if (!settings.mealTypes.includes('Dinner')) delete (dynamicDayPlanSchema.properties as any).dinner;
+    type DayPlanProperties = typeof dayPlanSchema.properties;
+    const dynamicProperties: Partial<DayPlanProperties> = { ...dayPlanSchema.properties };
+    if (!settings.mealTypes.includes('Breakfast')) delete dynamicProperties.breakfast;
+    if (!settings.mealTypes.includes('Lunch')) delete dynamicProperties.lunch;
+    if (!settings.mealTypes.includes('Dinner')) delete dynamicProperties.dinner;
+    const dynamicDayPlanSchema = { ...dayPlanSchema, properties: dynamicProperties };
 
     const dynamicMealPlanResponseSchema = {
         ...mealPlanResponseSchema,
@@ -104,8 +122,9 @@ export const generateMealPlan = async (settings: MealPlanSettings): Promise<Meal
         }
     }
 
-    // FIX: Use correct model 'gemini-2.5-flash' and API structure.
-    const response = await ai.models.generateContent({
+    // Ensure AI is configured before making API call
+    const genAI = ensureAI();
+    const response = await genAI.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -115,8 +134,10 @@ export const generateMealPlan = async (settings: MealPlanSettings): Promise<Meal
     });
 
     try {
-        // FIX: Extract text directly from response.text property.
-        const jsonText = response.text.trim();
+        const jsonText = response.text?.trim() || '';
+        if (!jsonText) {
+            throw new Error('Empty response from AI');
+        }
         return JSON.parse(jsonText) as MealPlanResponse;
     } catch (e) {
         console.error("Failed to parse Gemini response:", e);
@@ -149,7 +170,8 @@ Please provide ONLY the JSON for the new recipe for ${dayToReplace}'s ${mealType
 The recipe should not be something already present in the meal plan. It must include all fields: name, ingredients, instructions, estimated_cost, prep_time_minutes, cook_time_minutes, total_calories, protein_grams, carbs_grams, and fat_grams.
 `;
     
-    const response = await ai.models.generateContent({
+    const genAI = ensureAI();
+    const response = await genAI.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -159,7 +181,10 @@ The recipe should not be something already present in the meal plan. It must inc
     });
 
     try {
-        const jsonText = response.text.trim();
+        const jsonText = response.text?.trim() || '';
+        if (!jsonText) {
+            throw new Error('Empty response from AI');
+        }
         return JSON.parse(jsonText) as Recipe;
     } catch (e) {
         console.error("Failed to parse Gemini response for recipe replacement:", e);
@@ -200,7 +225,8 @@ ${JSON.stringify(mealPlan, null, 2)}
 Provide the response as a JSON object with a single key "shopping_list" which is an array of items.
 `;
 
-    const response = await ai.models.generateContent({
+    const genAI = ensureAI();
+    const response = await genAI.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -210,7 +236,10 @@ Provide the response as a JSON object with a single key "shopping_list" which is
     });
 
     try {
-        const jsonText = response.text.trim();
+        const jsonText = response.text?.trim() || '';
+        if (!jsonText) {
+            throw new Error('Empty response from AI');
+        }
         const parsed = JSON.parse(jsonText);
         return parsed.shopping_list as ShoppingListItem[];
     } catch (e) {
@@ -230,7 +259,8 @@ Items:
 - ${items.join('\n- ')}
 `;
 
-    const searchResponse = await ai.models.generateContent({
+    const genAI = ensureAI();
+    const searchResponse = await genAI.models.generateContent({
         model: "gemini-2.5-flash",
         contents: searchPrompt,
         config: {
@@ -238,8 +268,8 @@ Items:
         }
     });
 
-    const rawText = searchResponse.text;
-    if (!rawText || rawText.trim() === '') {
+    const rawText = searchResponse.text?.trim() || '';
+    if (!rawText) {
         throw new Error("The AI could not find any price information. The area might not have enough data.");
     }
 
@@ -280,7 +310,7 @@ ${rawText}
         }
     };
     
-    const structuredResponse = await ai.models.generateContent({
+    const structuredResponse = await genAI.models.generateContent({
         model: "gemini-2.5-flash",
         contents: structuringPrompt,
         config: {
@@ -290,7 +320,10 @@ ${rawText}
     });
 
     try {
-        const jsonText = structuredResponse.text.trim();
+        const jsonText = structuredResponse.text?.trim() || '';
+        if (!jsonText) {
+            throw new Error('Empty response from AI');
+        }
         return JSON.parse(jsonText) as ComparisonResult[];
     } catch (e) {
         console.error("Failed to parse Gemini response for price comparison:", e);
@@ -301,13 +334,17 @@ ${rawText}
 
 export const convertUnits = async (amount: string, fromUnit: string, toUnit: string, ingredient: string): Promise<string> => {
     const prompt = `Convert ${amount} ${fromUnit} of ${ingredient} to ${toUnit}. Provide only the resulting string, for example: "250 grams" or "approx. 1.5 cups".`;
-    const response = await ai.models.generateContent({
+    const genAI = ensureAI();
+    const response = await genAI.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt
     });
 
-    // Directly return the text response from the model
-    return response.text.trim();
+    const result = response.text?.trim() || '';
+    if (!result) {
+        throw new Error('Could not convert units. Please try again.');
+    }
+    return result;
 };
 
 export const generateExportableList = async (bestStoreName: string, items: {itemName: string, price: number}[]): Promise<string> => {
@@ -348,12 +385,17 @@ Your Shopping List for [Store Name]
 Total Estimated Cost: $[Total Price]
 `;
 
-    const response = await ai.models.generateContent({
+    const genAI = ensureAI();
+    const response = await genAI.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
     });
 
-    return response.text.trim();
+    const result = response.text?.trim() || '';
+    if (!result) {
+        throw new Error('Could not generate shopping list. Please try again.');
+    }
+    return result;
 };
 
 const simpleRecipeSchema = {
@@ -394,7 +436,8 @@ Do not suggest recipes that require ingredients not on my list.
 Provide the response as a JSON object with a single key "recipes" which is an array of recipe objects.
 `;
 
-    const response = await ai.models.generateContent({
+    const genAI = ensureAI();
+    const response = await genAI.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -404,7 +447,10 @@ Provide the response as a JSON object with a single key "recipes" which is an ar
     });
 
     try {
-        const jsonText = response.text.trim();
+        const jsonText = response.text?.trim() || '';
+        if (!jsonText) {
+            throw new Error('Empty response from AI');
+        }
         const parsed = JSON.parse(jsonText);
         return parsed.recipes as SimpleRecipe[];
     } catch (e) {
@@ -441,7 +487,8 @@ For each recipe, provide a detailed response in JSON format. Each recipe must in
 Ensure the output is a JSON object with a single key "recipes", which is an array of these recipe objects.
 `;
 
-    const response = await ai.models.generateContent({
+    const genAI = ensureAI();
+    const response = await genAI.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -451,7 +498,10 @@ Ensure the output is a JSON object with a single key "recipes", which is an arra
     });
 
     try {
-        const jsonText = response.text.trim();
+        const jsonText = response.text?.trim() || '';
+        if (!jsonText) {
+            throw new Error('Empty response from AI');
+        }
         const parsed = JSON.parse(jsonText);
         return parsed.recipes as Recipe[];
     } catch (e) {

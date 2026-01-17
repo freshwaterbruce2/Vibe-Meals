@@ -45,8 +45,9 @@ const PantryTracker: React.FC<PantryTrackerProps> = ({ pantryItems, onUpdatePant
         try {
             const recipes = await generatePantryRecipes(pantryItems, allMealPlanIngredients);
             setSuggestedRecipes(recipes);
-        } catch (err: any) {
-            setSuggestionError(err.message || 'Could not get suggestions.');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Could not get suggestions.';
+            setSuggestionError(errorMessage);
         } finally {
             setIsSuggesting(false);
         }

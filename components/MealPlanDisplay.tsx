@@ -64,9 +64,8 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = ({ mealPlanResponse, onR
     return total;
   };
 
-  const weekdayOrder = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-
   const sortedDays = useMemo(() => {
+    const weekdayOrder = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
     const daysCopy = [...days];
 
     switch (sortBy) {

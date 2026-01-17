@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MealPlanSettings } from '../types';
+import Toast from './Toast';
 
 interface BudgetSetupProps {
   onGenerate: (settings: MealPlanSettings) => void;
@@ -19,6 +20,7 @@ const BudgetSetup: React.FC<BudgetSetupProps> = ({ onGenerate, disabled }) => {
   const [preferredStores, setPreferredStores] = useState<Set<string>>(new Set());
   const [includeIngredients, setIncludeIngredients] = useState('');
   const [excludeIngredients, setExcludeIngredients] = useState('');
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleMealTypeChange = (mealType: typeof mealTypesOptions[number]) => {
     setSelectedMeals(prev => {
@@ -47,9 +49,10 @@ const BudgetSetup: React.FC<BudgetSetupProps> = ({ onGenerate, disabled }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedMeals.size === 0) {
-        alert("Please select at least one meal type to plan.");
+        setValidationError("Please select at least one meal type to plan.");
         return;
     }
+    setValidationError(null);
     onGenerate({
       budget: Number(budget),
       people: Number(people),
@@ -64,6 +67,7 @@ const BudgetSetup: React.FC<BudgetSetupProps> = ({ onGenerate, disabled }) => {
   };
 
   return (
+    <>
     <div style={glassCardStyle}>
       <h2 style={{ textAlign: 'center', marginTop: 0, marginBottom: '2rem', color: '#4a4a4a' }}>Create Your Meal Plan</h2>
       <form onSubmit={handleSubmit}>
@@ -136,6 +140,14 @@ const BudgetSetup: React.FC<BudgetSetupProps> = ({ onGenerate, disabled }) => {
         </div>
       </form>
     </div>
+    <Toast
+        message={validationError || ''}
+        type="error"
+        isVisible={!!validationError}
+        onClose={() => setValidationError(null)}
+        duration={4000}
+    />
+    </>
   );
 };
 

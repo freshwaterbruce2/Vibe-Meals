@@ -25,8 +25,9 @@ const UnitConverter: React.FC<UnitConverterProps> = ({ onClose }) => {
         try {
             const converted = await convertUnits(amount, fromUnit, toUnit, ingredient);
             setResult(converted);
-        } catch (err: any) {
-            setError(err.message || 'Failed to convert units.');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to convert units.';
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }

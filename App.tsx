@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import BudgetSetup from './components/BudgetSetup';
 import Header from './components/Header';
 import MealPlanDisplay from './components/MealPlanDisplay';
@@ -9,6 +9,9 @@ import PantryTracker from './components/PantryTracker';
 import SavedPlansModal from './components/SavedPlansModal';
 import RecipeSearch from './components/RecipeSearch';
 import AboutPage from './components/AboutPage';
+import ConfirmDialog from './components/ConfirmDialog';
+import InputDialog from './components/InputDialog';
+import Toast from './components/Toast';
 import { MealPlanSettings, MealPlanResponse, Recipe } from './types';
 import { generateMealPlan, replaceRecipe as apiReplaceRecipe, searchRecipes as apiSearchRecipes } from './services/geminiService';
 
@@ -32,6 +35,26 @@ const App: React.FC = () => {
     const [isSearching, setIsSearching] = useState<boolean>(false);
     const [searchError, setSearchError] = useState<string | null>(null);
     const [currentView, setCurrentView] = useState<'main' | 'about'>('main');
+
+    // Dialog states
+    const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [planToDelete, setPlanToDelete] = useState<number | null>(null);
+
+    // Toast state
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; isVisible: boolean }>({
+        message: '',
+        type: 'success',
+        isVisible: false,
+    });
+
+    const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+        setToast({ message, type, isVisible: true });
+    }, []);
+
+    const hideToast = useCallback(() => {
+        setToast(prev => ({ ...prev, isVisible: false }));
+    }, []);
 
     useEffect(() => {
         try {
@@ -67,8 +90,9 @@ const App: React.FC = () => {
             const plan = await generateMealPlan(newSettings);
             setMealPlan(plan);
             setLoadingState('idle');
-        } catch (err: any) {
-            setError(err.message || 'An unknown error occurred.');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+            setError(errorMessage);
             setLoadingState('error');
         }
     };
@@ -106,8 +130,9 @@ const App: React.FC = () => {
                 };
             });
 
-        } catch (err: any) {
-            setError(`Failed to replace recipe: ${err.message}`);
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            setError(`Failed to replace recipe: ${errorMessage}`);
         } finally {
             setLoadingState('idle');
         }
@@ -125,19 +150,22 @@ const App: React.FC = () => {
 
     const handleSavePlan = () => {
         if (!mealPlan || !settings) return;
-        const planName = prompt("Enter a name for this meal plan:", `Plan for ${settings.days} days`);
-        if (planName) {
-            const newPlan: SavedPlan = {
-                name: planName,
-                id: Date.now(),
-                settings,
-                mealPlan,
-            };
-            const updatedPlans = [...savedPlans, newPlan];
-            setSavedPlans(updatedPlans);
-            localStorage.setItem('mealVibePlans', JSON.stringify(updatedPlans));
-            alert(`Plan "${planName}" saved successfully!`);
-        }
+        setIsSaveDialogOpen(true);
+    };
+
+    const handleSavePlanConfirm = (planName: string) => {
+        if (!mealPlan || !settings) return;
+        const newPlan: SavedPlan = {
+            name: planName,
+            id: Date.now(),
+            settings,
+            mealPlan,
+        };
+        const updatedPlans = [...savedPlans, newPlan];
+        setSavedPlans(updatedPlans);
+        localStorage.setItem('mealVibePlans', JSON.stringify(updatedPlans));
+        setIsSaveDialogOpen(false);
+        showToast(`Plan "${planName}" saved successfully!`, 'success');
     };
 
     const handleLoadPlan = (planToLoad: SavedPlan) => {
@@ -149,11 +177,19 @@ const App: React.FC = () => {
     };
 
     const handleDeletePlan = (planId: number) => {
-        if (window.confirm("Are you sure you want to delete this plan?")) {
-            const updatedPlans = savedPlans.filter(p => p.id !== planId);
+        setPlanToDelete(planId);
+        setIsDeleteDialogOpen(true);
+    };
+
+    const handleDeletePlanConfirm = () => {
+        if (planToDelete !== null) {
+            const updatedPlans = savedPlans.filter(p => p.id !== planToDelete);
             setSavedPlans(updatedPlans);
             localStorage.setItem('mealVibePlans', JSON.stringify(updatedPlans));
+            showToast('Plan deleted successfully', 'success');
         }
+        setIsDeleteDialogOpen(false);
+        setPlanToDelete(null);
     };
 
     const handleRecipeSearch = async (query: string, includeIngredients: string[], excludeIngredients: string[]) => {
@@ -163,8 +199,9 @@ const App: React.FC = () => {
         try {
             const results = await apiSearchRecipes(query, includeIngredients, excludeIngredients);
             setSearchResults(results);
-        } catch (err: any) {
-            setSearchError(err.message || 'An unknown error occurred while searching.');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while searching.';
+            setSearchError(errorMessage);
         } finally {
             setIsSearching(false);
         }
@@ -244,13 +281,45 @@ const App: React.FC = () => {
             )}
             
             {isPlansModalVisible && (
-                <SavedPlansModal 
+                <SavedPlansModal
                     savedPlans={savedPlans}
                     onLoad={handleLoadPlan}
                     onDelete={handleDeletePlan}
                     onClose={() => setIsPlansModalVisible(false)}
                 />
             )}
+
+            <InputDialog
+                isOpen={isSaveDialogOpen}
+                title="Save Meal Plan"
+                message="Enter a name for this meal plan:"
+                placeholder="My Meal Plan"
+                defaultValue={settings ? `Plan for ${settings.days} days` : 'My Meal Plan'}
+                confirmText="Save"
+                onConfirm={handleSavePlanConfirm}
+                onCancel={() => setIsSaveDialogOpen(false)}
+            />
+
+            <ConfirmDialog
+                isOpen={isDeleteDialogOpen}
+                title="Delete Plan"
+                message="Are you sure you want to delete this plan? This action cannot be undone."
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="danger"
+                onConfirm={handleDeletePlanConfirm}
+                onCancel={() => {
+                    setIsDeleteDialogOpen(false);
+                    setPlanToDelete(null);
+                }}
+            />
+
+            <Toast
+                message={toast.message}
+                type={toast.type}
+                isVisible={toast.isVisible}
+                onClose={hideToast}
+            />
         </div>
     );
 };

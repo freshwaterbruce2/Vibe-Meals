@@ -4,6 +4,7 @@ import { generateShoppingList, comparePrices } from '../services/geminiService';
 import Loader from './Loader';
 import StoreComparisonDisplay from './StoreComparisonDisplay';
 import UnitConverter from './UnitConverter';
+import ConfirmDialog from './ConfirmDialog';
 
 interface ShoppingListProps {
   mealPlan: MealPlanResponse;
@@ -17,6 +18,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ mealPlan, pantryItems }) =>
   const [isComparing, setIsComparing] = useState(false);
   const [comparisonResults, setComparisonResults] = useState<ComparisonResult[] | null>(null);
   const [isConverterVisible, setIsConverterVisible] = useState(false);
+  const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -37,8 +39,9 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ mealPlan, pantryItems }) =>
           return { ...item, checked: inPantry };
       });
       setShoppingList(listWithPantryCheck);
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate shopping list.');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate shopping list.';
+      setError(errorMessage);
     } finally {
       setIsGenerating(false);
     }
@@ -65,9 +68,12 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ mealPlan, pantryItems }) =>
   };
   
   const handleClearPantryItems = () => {
-      if (window.confirm("Are you sure you want to remove all items marked as 'in pantry' from this list?")) {
-          setShoppingList(prevList => prevList.filter(item => !item.checked));
-      }
+      setIsClearDialogOpen(true);
+  };
+
+  const handleClearPantryItemsConfirm = () => {
+      setShoppingList(prevList => prevList.filter(item => !item.checked));
+      setIsClearDialogOpen(false);
   };
 
   const handleComparePrices = async (zipCode: string) => {
@@ -79,8 +85,9 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ mealPlan, pantryItems }) =>
             const results = await comparePrices(itemsToCompare, zipCode);
             setComparisonResults(results);
         }
-    } catch (err: any) {
-        setError(err.message || 'Failed to compare prices.');
+    } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to compare prices.';
+        setError(errorMessage);
     } finally {
         setIsComparing(false);
     }
@@ -162,6 +169,16 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ mealPlan, pantryItems }) =>
       )}
     </div>
     {isConverterVisible && <UnitConverter onClose={() => setIsConverterVisible(false)} />}
+    <ConfirmDialog
+        isOpen={isClearDialogOpen}
+        title="Clear Pantry Items"
+        message="Are you sure you want to remove all items marked as 'in pantry' from this list?"
+        confirmText="Clear Items"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={handleClearPantryItemsConfirm}
+        onCancel={() => setIsClearDialogOpen(false)}
+    />
     </>
   );
 };

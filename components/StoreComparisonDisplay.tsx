@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ComparisonResult } from '../types';
 import Loader from './Loader';
 import ExportListModal from './ExportListModal';
+import Toast from './Toast';
 
 interface StoreComparisonDisplayProps {
   results: ComparisonResult[] | null;
@@ -13,12 +14,14 @@ interface StoreComparisonDisplayProps {
 const StoreComparisonDisplay: React.FC<StoreComparisonDisplayProps> = ({ results, onCompare, isComparing, selectedItemCount }) => {
   const [zipCode, setZipCode] = useState('');
   const [isExportModalVisible, setIsExportModalVisible] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleCompareClick = () => {
     if (!/^\d{5}$/.test(zipCode)) {
-        alert("Please enter a valid 5-digit Zip Code.");
+        setValidationError("Please enter a valid 5-digit Zip Code.");
         return;
     }
+    setValidationError(null);
     onCompare(zipCode);
   }
 
@@ -121,6 +124,13 @@ const StoreComparisonDisplay: React.FC<StoreComparisonDisplayProps> = ({ results
           onClose={() => setIsExportModalVisible(false)}
       />
     )}
+    <Toast
+        message={validationError || ''}
+        type="error"
+        isVisible={!!validationError}
+        onClose={() => setValidationError(null)}
+        duration={4000}
+    />
     </>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ComparisonResult } from '../types';
 import { generateExportableList } from '../services/geminiService';
+import Toast from './Toast';
 
 interface ExportListModalProps {
     bestStoreName: string;
@@ -12,6 +13,7 @@ const ExportListModal: React.FC<ExportListModalProps> = ({ bestStoreName, result
     const [copyButtonText, setCopyButtonText] = useState('Copy to Clipboard');
     const [formattedList, setFormattedList] = useState<string>('Generating your optimized list...');
     const [isLoading, setIsLoading] = useState(true);
+    const [copyError, setCopyError] = useState<string | null>(null);
 
     useEffect(() => {
         const generateList = async () => {
@@ -48,13 +50,18 @@ const ExportListModal: React.FC<ExportListModalProps> = ({ bestStoreName, result
 
     const handleCopy = () => {
         if (isLoading) return;
-        navigator.clipboard.writeText(formattedList).then(() => {
-            setCopyButtonText('Copied!');
-            setTimeout(() => setCopyButtonText('Copy to Clipboard'), 2000);
-        }).catch(err => {
-            console.error('Failed to copy text: ', err);
-            alert('Failed to copy list to clipboard.');
-        });
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(formattedList).then(() => {
+                setCopyButtonText('Copied!');
+                setTimeout(() => setCopyButtonText('Copy to Clipboard'), 2000);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+                setCopyError('Failed to copy list to clipboard.');
+            });
+        } else {
+            // Fallback for browsers without clipboard API
+            setCopyError('Clipboard not available. Please select and copy manually.');
+        }
     };
     
     return (
@@ -78,6 +85,13 @@ const ExportListModal: React.FC<ExportListModalProps> = ({ bestStoreName, result
                     </button>
                 </div>
             </div>
+            <Toast
+                message={copyError || ''}
+                type="error"
+                isVisible={!!copyError}
+                onClose={() => setCopyError(null)}
+                duration={4000}
+            />
         </div>
     );
 };
